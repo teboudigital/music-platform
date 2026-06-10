@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.coverage
+**/venv
+**/node_modules
+**/.env
+**/db.sqlite3
+**/media
+**/staticfiles
+**/.git
+**/README.md

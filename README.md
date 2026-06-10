@@ -1,178 +1,184 @@
-# 🎵 Music Platform — Lyrics & Chords Web App
+# 🎵 Music Platform
 
-## Overview
-
-This project is a **music-oriented web platform** designed to help musicians, bands, and groups manage song lyrics, chord charts, and musical metadata in a structured and collaborative way.
-
-The platform focuses on:
-
-* clarity and usability for musicians
-* clean separation between domain logic and presentation
-* scalability from personal use to group collaboration
-* progressive enhancement from a web app to mobile usage
-
-The application is built as an **API-first system** with a modern frontend client.
+Piattaforma web per la gestione di testi e accordi musicali — per musicisti, band e gruppi.
+Backend Django REST + Frontend React, con supporto multilingua IT / FR / EN.
 
 ---
 
-## Goals
+## Stack Tecnologico
 
-The main goals of this project are:
-
-* Provide a clean and efficient way to create and manage songs with lyrics and chords
-* Support musical concepts such as key, transposition, and chord difficulty levels
-* Enable both individual and group usage
-* Build a solid technical foundation suitable for long-term evolution
-* Serve as a professional-grade software project, not a prototype
-
----
-
-## Core Features (MVP 1)
-
-* User authentication
-* Song creation and management
-* Lyrics editor with chord annotations
-* Musical metadata:
-
-  * title
-  * author
-  * language
-  * key
-* Personal song library
-* Mobile-first responsive interface
-
-Future features are intentionally excluded from the first iteration to preserve focus and quality.
+| Layer | Tecnologie |
+| ------ | ---------- |
+| Backend | Django 6.0.6 · DRF 3.17.1 · SimpleJWT · django-filter · drf-nested-routers |
+| Frontend | React 19 · Vite · React Router v7 · Axios · i18next |
+| Auth | JWT (access + refresh) con rotazione automatica e blacklist |
+| Infra | Docker · Docker Compose · Nginx · Gunicorn |
+| CI/CD | GitHub Actions (backend + frontend) |
+| Test | pytest-django + factory_boy (backend) · Vitest + RTL (frontend) |
 
 ---
 
-## Architecture Overview
+## Funzionalità Implementate
 
-The project follows a **decoupled architecture**:
-
-* **Backend**: Django + Django REST Framework
-  Responsible for business logic, data modeling, authentication, and API exposure.
-
-* **Frontend**: React
-  Responsible for user experience, presentation, and interaction with the API.
-
-Communication between frontend and backend is handled exclusively through HTTP APIs.
-
-The repository is structured as a **monorepo** for early-stage development, while keeping backend and frontend logically isolated to allow future separation if needed.
+- Registrazione / Login con email e password
+- Gestione canzoni: titolo, artista, tonalità, modo, BPM, testo con accordi
+- Trasposizione accordi in tempo reale (±semitoni)
+- Gruppi musicali e membership con ruoli
+- Setlist per concerti con ordine e trasposizione per canzone
+- Profilo utente multilingua (IT / FR / EN)
+- GDPR: esportazione dati e cancellazione account
+- Rate limiting e Audit Log
 
 ---
 
-## Repository Structure
+## Avvio in Locale
+
+### Prerequisiti
+
+- Python 3.11+
+- Node.js 20+
+- Git
+
+### Backend
+
+```powershell
+cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux/Mac
+
+pip install -r requirements/development.txt
+python manage.py migrate --settings=config.settings.development
+python manage.py createsuperuser --settings=config.settings.development
+python manage.py runserver --settings=config.settings.development
+```
+
+Backend disponibile su: `http://localhost:8000`
+Admin disponibile su: `http://localhost:8000/admin/`
+
+### Frontend
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend disponibile su: `http://localhost:5173`
+
+### Credenziali superadmin (sviluppo)
 
 ```text
-music-platform/
-│
-├── backend/                # Django backend (API)
-│   ├── config/             # Project configuration
-│   ├── apps/               # Domain-driven Django apps
-│   │   ├── users/
-│   │   ├── songs/
-│   │   ├── groups/
-│   │   └── setlists/
-│   ├── manage.py
-│   └── requirements.txt
-│
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/       # API clients
-│   │   └── i18n/
-│   └── package.json
-│
-├── README.md
-└── .gitignore
+Email:    tebou.digital@gmail.com
+Password: Admin1234!
 ```
 
 ---
 
-## Design Principles
+## Variabili d'Ambiente
 
-This project is guided by the following principles:
+Copia `.env.example` in `backend/.env` e personalizza i valori:
 
-* **Separation of concerns**
-  Domain logic, API layer, and UI are clearly separated.
-
-* **Explicitness over magic**
-  Decisions are documented and structures are intentional.
-
-* **Progressive complexity**
-  The system starts simple and grows only when justified by real needs.
-
-* **Domain-driven thinking**
-  Musical concepts drive the data model and services, not frameworks.
+```powershell
+cp .env.example backend/.env
+```
 
 ---
 
-## Technology Stack
+## Test
 
-### Backend
+### Test Backend
 
-* Python
-* Django
-* Django REST Framework
-* PostgreSQL
+```powershell
+cd backend
+venv\Scripts\python.exe -m pytest
+```
 
-### Frontend
+Risultato atteso: **33/33 test passati**
 
-* JavaScript
-* React
-* Modern CSS (mobile-first approach)
+### Test Frontend
 
----
+```powershell
+cd frontend
+npm test
+```
 
-## Language and Naming Conventions
-
-* User interface and documentation: **French**
-* Codebase (classes, variables, APIs): **English**
-
-This separation ensures both clarity for end users and maintainability for developers.
+Risultato atteso: **9/9 test passati**
 
 ---
 
-## Development Philosophy
+## Build Production
 
-This is not a tutorial project.
+```powershell
+cd frontend
+npm run build          # output in frontend/dist/
+```
 
-The codebase is intended to:
+Con Docker:
 
-* remain readable over time
-* be easy to test and refactor
-* support future contributors
-* evolve toward production readiness
-
-Shortcuts are avoided when they would compromise long-term quality.
-
----
-
-## Roadmap (High-Level)
-
-* MVP 1: Individual usage (songs, lyrics, chords)
-* MVP 2: Musical intelligence (transposition, difficulty levels)
-* MVP 3: Group collaboration
-* MVP 4: Advanced features (audio analysis, offline mode)
-
-Details are intentionally omitted at this stage.
+```powershell
+docker compose up --build
+```
 
 ---
 
-## Getting Started
+## Struttura del Repository
 
-Instructions for local development will be added once the initial backend and frontend skeletons are in place.
+```text
+music-platform/
+├── backend/
+│   ├── apps/
+│   │   ├── common/          # AbstractBaseModel, IsOwner, AuditLog, throttling
+│   │   ├── users/           # CustomUser, Profile, GDPR views
+│   │   ├── songs/           # Song, LyricLine, ChordAnnotation, trasposizione
+│   │   ├── groups/          # MusicGroup, Membership
+│   │   └── setlists/        # Setlist, SetlistItem
+│   ├── config/
+│   │   ├── settings/        # base / development / production / testing
+│   │   └── urls.py
+│   ├── requirements/        # base / development / production / testing
+│   ├── Dockerfile
+│   └── pytest.ini
+├── frontend/
+│   ├── src/
+│   │   ├── api/             # client.js, auth.js, songs.js, groups.js, setlists.js
+│   │   ├── components/      # Navbar, ProtectedRoute
+│   │   ├── contexts/        # AuthContext
+│   │   ├── i18n/            # it.js, fr.js, en.js
+│   │   ├── pages/           # auth/, songs/, groups/, setlists/, ProfilePage
+│   │   └── test/            # setup.js
+│   └── vite.config.js
+├── nginx/
+│   └── nginx.conf
+├── docker-compose.yml
+├── .env.example
+└── .github/
+    └── workflows/
+        ├── backend-ci.yml
+        └── frontend-ci.yml
+```
 
 ---
 
-## License
+## API Principali
 
-This project is currently intended for personal and educational use.
-Licensing terms may evolve as the project matures.
+| Metodo | Endpoint | Descrizione |
+| ------ | -------- | ----------- |
+| POST | `/api/v1/auth/register/` | Registrazione |
+| POST | `/api/v1/auth/login/` | Login → JWT |
+| POST | `/api/v1/auth/refresh/` | Rinnova access token |
+| POST | `/api/v1/auth/logout/` | Blacklist refresh token |
+| GET/PATCH | `/api/v1/auth/me/` | Profilo utente |
+| GET | `/api/v1/auth/me/export/` | Export dati GDPR |
+| DELETE | `/api/v1/auth/me/delete/` | Cancella account |
+| GET/POST | `/api/v1/songs/` | Lista / crea canzoni |
+| GET | `/api/v1/songs/{id}/transpose/?semitones=N` | Trasposizione |
+| GET/POST | `/api/v1/songs/{id}/lines/` | Righe testo |
+| GET/POST | `/api/v1/groups/` | Gruppi musicali |
+| GET/POST | `/api/v1/setlists/` | Scalette |
 
 ---
 
-## Author
+## Licenza
 
-Built and maintained as a long-term software engineering project.
+Uso personale ed educativo.
