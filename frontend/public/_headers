@@ -1,0 +1,2 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src 'self' https://music-platform-backend-9ljf.onrender.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:;
