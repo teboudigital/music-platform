@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'drf_spectacular',
 
     # Apps locali
     'apps.common',
@@ -103,6 +104,22 @@ REST_FRAMEWORK = {
         'user': '1000/day',
         'login': '10/hour',  # throttle specifica per il login
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Music Platform API',
+    'DESCRIPTION': (
+        'REST API for managing songs, groups, setlists and repertoires. '
+        'All endpoints require JWT authentication.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAuthenticated'],
+    'SWAGGER_UI_SETTINGS': {
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+    },
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 SIMPLE_JWT = {
