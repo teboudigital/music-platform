@@ -1,8 +1,3 @@
-/**
- * AuthContext: gestisce lo stato di autenticazione globale.
- * Fornisce: user, login(), logout(), isAuthenticated, loading.
- * I token JWT vengono salvati in localStorage.
- */
 import { createContext, useContext, useEffect, useState } from 'react';
 import * as authApi from '../api/auth';
 
@@ -12,7 +7,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Al mount, controlla se c'è già un token valido
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -21,17 +15,33 @@ export function AuthProvider({ children }) {
         .catch(() => {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('guest_token');
+          return createGuestSession();
         })
         .finally(() => setLoading(false));
     } else {
-      setLoading(false);
+      createGuestSession().finally(() => setLoading(false));
     }
   }, []);
+
+  const createGuestSession = async () => {
+    try {
+      const res = await authApi.createGuest();
+      localStorage.setItem('access_token', res.data.access);
+      localStorage.setItem('refresh_token', res.data.refresh);
+      localStorage.setItem('guest_token', res.data.guest_token);
+      const me = await authApi.getMe();
+      setUser(me.data);
+    } catch {
+      // nessuna connessione — rimane non autenticato
+    }
+  };
 
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
     localStorage.setItem('access_token', res.data.access);
     localStorage.setItem('refresh_token', res.data.refresh);
+    localStorage.removeItem('guest_token');
     const me = await authApi.getMe();
     setUser(me.data);
     return me.data;
@@ -43,7 +53,10 @@ export function AuthProvider({ children }) {
     } finally {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('guest_token');
       setUser(null);
+      // Crea nuova sessione guest dopo logout
+      await createGuestSession();
     }
   };
 
@@ -52,8 +65,18 @@ export function AuthProvider({ children }) {
     setUser(me.data);
   };
 
+  const isGuest = user?.is_guest === true;
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, refreshUser, isAuthenticated: !!user, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      login,
+      logout,
+      refreshUser,
+      isAuthenticated: !!user,
+      isGuest,
+      loading,
+    }}>
       {children}
     </AuthContext.Provider>
   );

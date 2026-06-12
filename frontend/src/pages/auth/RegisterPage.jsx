@@ -21,7 +21,8 @@ export default function RegisterPage() {
     setErrors({});
     setLoading(true);
     try {
-      await register(form);
+      const guestToken = localStorage.getItem('guest_token');
+      await register({ ...form, ...(guestToken ? { guest_token: guestToken } : {}) });
       await login(form.email, form.password);
       navigate('/songs');
     } catch (err) {

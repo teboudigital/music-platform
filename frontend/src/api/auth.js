@@ -1,5 +1,8 @@
 import client from './client';
 
+export const createGuest = () =>
+  client.post('/auth/guest/');
+
 export const login = (email, password) =>
   client.post('/auth/login/', { email, password });
 

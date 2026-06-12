@@ -2,6 +2,8 @@
 Views per autenticazione e gestione profilo utente.
 I token JWT (login/logout/refresh) sono gestiti direttamente da SimpleJWT in users/urls.py.
 """
+import uuid
+
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
@@ -12,10 +14,42 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.models import AuditLog
 from .models import CustomUser, Profile
 from .serializers import ProfileSerializer, RegisterSerializer, UserSerializer
+
+
+class GuestCreateView(APIView):
+    """
+    POST /api/v1/auth/guest/
+    Crea un utente guest temporaneo con JWT. Nessuna registrazione richiesta.
+    Il guest viene automaticamente aggiunto ai gruppi pubblici (es. VERSO).
+    Alla registrazione reale, il guest_token permette di convertire l'account
+    mantenendo tutti i dati (canti, gruppi).
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from apps.groups.models import Membership, MusicGroup
+        unique_id = uuid.uuid4().hex[:12]
+        user = CustomUser.objects.create_user(
+            email=f"guest_{unique_id}@guest.internal",
+            username=f"guest_{unique_id}",
+            password=uuid.uuid4().hex,
+            is_guest=True,
+        )
+        Profile.objects.create(user=user)
+        for group in MusicGroup.objects.filter(is_public=True):
+            Membership.objects.create(user=user, group=group, role=Membership.Role.MEMBER)
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'guest_token': str(user.guest_token),
+            'is_guest': True,
+        }, status=status.HTTP_201_CREATED)
 
 
 class RegisterView(generics.CreateAPIView):

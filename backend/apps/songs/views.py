@@ -70,8 +70,18 @@ class SongViewSet(viewsets.ModelViewSet):
         return SongSerializer
 
     def perform_create(self, serializer):
-        """Assegna automaticamente l'utente autenticato come owner della canzone."""
-        serializer.save(owner=self.request.user)
+        user = self.request.user
+        if user.is_guest:
+            group_id = self.request.data.get('group')
+            if group_id:
+                if Song.objects.filter(group_id=group_id).count() >= 100:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied('Limite di 100 canti per gruppo raggiunto. Registrati per continuare.')
+            else:
+                if Song.objects.filter(owner=user, group=None).count() >= 50:
+                    from rest_framework.exceptions import PermissionDenied
+                    raise PermissionDenied('Limite di 50 canti personali raggiunto. Registrati per continuare.')
+        serializer.save(owner=user)
 
     @action(detail=False, methods=['get'], url_path='topics')
     def topics(self, request):

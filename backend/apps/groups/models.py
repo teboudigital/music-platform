@@ -20,6 +20,7 @@ class MusicGroup(AbstractBaseModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     invite_token = models.UUIDField(default=_uuid.uuid4, unique=True, db_index=True)
+    is_public = models.BooleanField(default=False, db_index=True)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

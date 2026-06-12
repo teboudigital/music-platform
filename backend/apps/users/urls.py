@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenBlacklistView
 
 from apps.common.throttling import LoginRateThrottle
-from .views import ChangeEmailView, ChangePasswordView, DeleteAccountView, ExportDataView, MeView, PasswordResetConfirmView, PasswordResetRequestView, ProfileView, RegisterView
+from .views import ChangeEmailView, ChangePasswordView, DeleteAccountView, ExportDataView, GuestCreateView, MeView, PasswordResetConfirmView, PasswordResetRequestView, ProfileView, RegisterView
 
 
 class ThrottledTokenObtainPairView(TokenObtainPairView):
@@ -11,6 +11,7 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 
 
 urlpatterns = [
+    path('guest/', GuestCreateView.as_view(), name='guest_create'),
     path('register/', RegisterView.as_view(), name='register'),
     path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),

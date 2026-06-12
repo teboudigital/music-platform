@@ -32,8 +32,13 @@ class MusicGroupViewSet(viewsets.ModelViewSet):
         return MusicGroupSerializer
 
     def perform_create(self, serializer):
-        group = serializer.save(owner=self.request.user)
-        Membership.objects.create(user=self.request.user, group=group, role=Membership.Role.ADMIN)
+        user = self.request.user
+        if user.is_guest:
+            if Membership.objects.filter(user=user).count() >= 2:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied('Limite di 2 gruppi raggiunto. Registrati per continuare.')
+        group = serializer.save(owner=user)
+        Membership.objects.create(user=user, group=group, role=Membership.Role.ADMIN)
 
     def _is_admin(self, user, group):
         return Membership.objects.filter(user=user, group=group, role=Membership.Role.ADMIN).exists()

@@ -16,9 +16,12 @@ class CustomUser(AbstractUser):
     - UUID come primary key (più sicuro degli integer ID nelle URL)
     - Login tramite email invece che username
     - Manager personalizzato per create_user/create_superuser
+    - is_guest + guest_token per sessioni demo senza registrazione
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
+    is_guest = models.BooleanField(default=False)
+    guest_token = models.UUIDField(default=uuid.uuid4, unique=True)
 
     # Django usa questo campo per il login
     USERNAME_FIELD = 'email'
