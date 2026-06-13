@@ -85,45 +85,177 @@ class SongViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='import-template')
     def import_template(self, request):
-        """GET /api/v1/songs/import-template/ — scarica template Excel vuoto."""
+        """GET /api/v1/songs/import-template/ — scarica template Excel compilabile."""
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, fills
         from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.datavalidation import DataValidation
+        from openpyxl.worksheet.dimensions import RowDimension
         from django.http import HttpResponse
 
+        KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B']
+        MODES = ['major', 'minor']
+
         wb = Workbook()
-        ws = wb.active
-        ws.title = 'Canti'
 
-        headers = ['title *', 'artist', 'key', 'mode', 'bpm', 'time_signature', 'notes', 'song_number', 'topics']
-        notes_row = [
-            'Obbligatorio',
-            'Facoltativo',
-            'C C# Db D D# Eb E F F# Gb G G# Ab A A# Bb B',
-            'major / minor',
-            'Numero intero',
-            'es: 4/4  3/4  6/8',
-            'Facoltativo',
-            'Numero intero',
-            'Separati da virgola',
+        # ── Foglio 1: Istruzioni ─────────────────────────────────────────────
+        ws_help = wb.active
+        ws_help.title = 'Istruzioni'
+        ws_help.column_dimensions['A'].width = 22
+        ws_help.column_dimensions['B'].width = 55
+        ws_help.column_dimensions['C'].width = 28
+
+        title_font = Font(bold=True, size=14, color='1F4E79')
+        head_font  = Font(bold=True, size=10, color='FFFFFF')
+        body_font  = Font(size=10)
+        req_fill   = PatternFill('solid', fgColor='C00000')
+        opt_fill   = PatternFill('solid', fgColor='2E75B6')
+        head_fill  = PatternFill('solid', fgColor='1F4E79')
+        thin = Border(
+            left=Side(style='thin', color='BFBFBF'),
+            right=Side(style='thin', color='BFBFBF'),
+            top=Side(style='thin', color='BFBFBF'),
+            bottom=Side(style='thin', color='BFBFBF'),
+        )
+
+        ws_help.merge_cells('A1:C1')
+        t = ws_help.cell(1, 1, '🎵 Music Platform — Istruzioni importazione canti')
+        t.font = title_font
+        t.alignment = Alignment(horizontal='left', vertical='center')
+        ws_help.row_dimensions[1].height = 28
+
+        ws_help.merge_cells('A2:C2')
+        ws_help.cell(2, 1, 'Compila il foglio "Canti" e importalo dall\'app. I campi con * sono obbligatori.')
+        ws_help.cell(2, 1).font = Font(size=10, italic=True, color='595959')
+
+        ws_help.row_dimensions[3].height = 6  # spazio
+
+        for col, label in enumerate(['Colonna', 'Descrizione', 'Valori accettati'], 1):
+            c = ws_help.cell(4, col, label)
+            c.font = head_font; c.fill = head_fill
+            c.alignment = Alignment(horizontal='center', vertical='center')
+            c.border = thin
+        ws_help.row_dimensions[4].height = 20
+
+        fields = [
+            ('title  ★ OBBLIGATORIO', 'Titolo del canto',                              'Testo libero',                True),
+            ('artist',                'Artista o autore',                               'Testo libero',                False),
+            ('key',                   'Tonalità (usa il menu a tendina)',                ', '.join(KEYS),               False),
+            ('mode',                  'Modo (usa il menu a tendina)',                    'major  oppure  minor',        False),
+            ('bpm',                   'Tempo in battiti per minuto',                     'Numero intero es: 120',       False),
+            ('time_signature',        'Indicazione di tempo',                            'es: 4/4  3/4  6/8  12/8',    False),
+            ('notes',                 'Note libere sul canto',                           'Testo libero',                False),
+            ('song_number',           'Numero d\'ordine nel repertorio',                 'Numero intero es: 42',        False),
+            ('topics',                'Argomenti / categorie (più valori separati da ,)', 'es: adorazione, lode, Maria', False),
         ]
-        widths = [30, 25, 40, 15, 12, 18, 40, 15, 40]
 
-        header_fill = PatternFill('solid', fgColor='1F4E79')
-        note_fill = PatternFill('solid', fgColor='D6E4F0')
+        req_label_fill  = PatternFill('solid', fgColor='FFE7E7')
+        opt_label_fill  = PatternFill('solid', fgColor='EBF3FB')
 
-        for col, (h, n, w) in enumerate(zip(headers, notes_row, widths), 1):
-            cell = ws.cell(row=1, column=col, value=h)
-            cell.font = Font(bold=True, color='FFFFFF')
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal='center')
-            note = ws.cell(row=2, column=col, value=n)
-            note.fill = note_fill
-            note.font = Font(italic=True, size=9, color='1F4E79')
-            ws.column_dimensions[get_column_letter(col)].width = w
+        for r, (col_name, desc, values, required) in enumerate(fields, start=5):
+            bg = req_label_fill if required else opt_label_fill
+            badge_fill = req_fill if required else opt_fill
+            badge_text = '★ OBB.' if required else 'facolt.'
 
-        # Riga esempio
-        ws.append(['Ave Maria', 'Schubert', 'F', 'major', 120, '4/4', '', 1, 'adorazione, lode'])
+            c1 = ws_help.cell(r, 1, col_name)
+            c1.font = Font(bold=required, size=10); c1.fill = bg; c1.border = thin
+            c1.alignment = Alignment(vertical='center', wrap_text=True)
+
+            c2 = ws_help.cell(r, 2, desc)
+            c2.font = body_font; c2.fill = bg; c2.border = thin
+            c2.alignment = Alignment(vertical='center', wrap_text=True)
+
+            c3 = ws_help.cell(r, 3, values)
+            c3.font = Font(size=9, color='595959'); c3.fill = bg; c3.border = thin
+            c3.alignment = Alignment(vertical='center', wrap_text=True)
+
+            ws_help.row_dimensions[r].height = 30
+
+        ws_help.merge_cells('A15:C15')
+        ws_help.cell(15, 1, '→ Vai al foglio "Canti" per inserire i tuoi dati')
+        ws_help.cell(15, 1).font = Font(bold=True, color='2E75B6', size=11)
+        ws_help.sheet_view.showGridLines = False
+
+        # ── Foglio 2: Canti ──────────────────────────────────────────────────
+        ws = wb.create_sheet('Canti')
+
+        columns = [
+            # (intestazione, larghezza, obbligatorio)
+            ('title',          32, True),
+            ('artist',         26, False),
+            ('key',            10, False),
+            ('mode',           12, False),
+            ('bpm',            10, False),
+            ('time_signature', 16, False),
+            ('notes',          42, False),
+            ('song_number',    14, False),
+            ('topics',         42, False),
+        ]
+
+        req_hdr_fill = PatternFill('solid', fgColor='C00000')
+        opt_hdr_fill = PatternFill('solid', fgColor='2E75B6')
+        req_data_fill = PatternFill('solid', fgColor='FFF2F2')
+        opt_data_fill = PatternFill('solid', fgColor='F5FAFF')
+
+        for col_idx, (name, width, required) in enumerate(columns, 1):
+            col_letter = get_column_letter(col_idx)
+            label = f'{name}  ★' if required else name
+            cell = ws.cell(1, col_idx, label)
+            cell.font = Font(bold=True, color='FFFFFF', size=10)
+            cell.fill = req_hdr_fill if required else opt_hdr_fill
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = thin
+            ws.column_dimensions[col_letter].width = width
+
+            # Colora le celle dati (righe 2-500)
+            data_fill = req_data_fill if required else opt_data_fill
+            for row_idx in range(2, 501):
+                dc = ws.cell(row_idx, col_idx)
+                dc.fill = data_fill
+                dc.border = thin
+                dc.alignment = Alignment(vertical='center', wrap_text=(col_idx in (7, 9)))
+
+        ws.row_dimensions[1].height = 22
+        ws.freeze_panes = 'A2'  # intestazione sempre visibile
+
+        # Dropdown key (colonna C)
+        dv_key = DataValidation(
+            type='list',
+            formula1='"' + ','.join(KEYS) + '"',
+            allow_blank=True,
+            showDropDown=False,
+            error='Valore non valido. Scegli dal menu.',
+            errorTitle='Tonalità non valida',
+            prompt='Scegli la tonalità dal menu',
+            promptTitle='Tonalità',
+        )
+        dv_key.sqref = 'C2:C500'
+        ws.add_data_validation(dv_key)
+
+        # Dropdown mode (colonna D)
+        dv_mode = DataValidation(
+            type='list',
+            formula1='"major,minor"',
+            allow_blank=True,
+            showDropDown=False,
+            error='Scrivi "major" oppure "minor".',
+            errorTitle='Modo non valido',
+            prompt='Scegli "major" o "minor"',
+            promptTitle='Modo',
+        )
+        dv_mode.sqref = 'D2:D500'
+        ws.add_data_validation(dv_mode)
+
+        # Riga esempio (precompilata)
+        example = ['Ave Maria', 'Schubert', 'F', 'major', 120, '4/4', 'Canto mariano classico', 1, 'adorazione, Maria']
+        for col_idx, val in enumerate(example, 1):
+            c = ws.cell(2, col_idx, val)
+            c.font = Font(italic=True, color='595959', size=9)
+
+        ws.sheet_view.showGridLines = False
+
+        # Imposta "Canti" come foglio attivo all'apertura
+        wb.active = ws
 
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -154,7 +286,7 @@ class SongViewSet(viewsets.ModelViewSet):
 
         try:
             wb = load_workbook(file, read_only=True, data_only=True)
-            ws = wb.active
+            ws = wb['Canti'] if 'Canti' in wb.sheetnames else wb.active
         except Exception:
             return Response({'detail': 'File non valido. Carica un file .xlsx.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -164,7 +296,7 @@ class SongViewSet(viewsets.ModelViewSet):
         errors = []
         songs_to_create = []
 
-        for i, row in enumerate(ws.iter_rows(min_row=3, values_only=True), start=3):
+        for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not row or not any(row):
                 continue
 
