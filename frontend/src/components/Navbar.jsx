@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import i18n from '../i18n';
@@ -85,7 +85,17 @@ export default function Navbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/songs" className="navbar-brand">🎵 Music Platform</Link>
+      <Link to="/" className="navbar-brand">🎵 Music Platform</Link>
+
+      <div className="navbar-nav">
+        <NavLink to="/come-funziona" className={({ isActive }) => `navbar-navlink${isActive ? ' active' : ''}`}>
+          {t('nav.howItWorks')}
+        </NavLink>
+        <NavLink to="/songs" className={({ isActive }) => `navbar-navlink${isActive ? ' active' : ''}`}>
+          {t('nav.songs')}
+        </NavLink>
+      </div>
+
       <div className="navbar-right">
         <LangDropdown />
         {isGuest ? (

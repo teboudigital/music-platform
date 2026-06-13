@@ -17,6 +17,7 @@ import SetlistsPage from './pages/setlists/SetlistsPage';
 import SetlistDetailPage from './pages/setlists/SetlistDetailPage';
 import SetlistFormPage from './pages/setlists/SetlistFormPage';
 import ProfilePage from './pages/ProfilePage';
+import HowItWorksPage from './pages/HowItWorksPage';
 import './i18n';
 import './App.css';
 
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
+          <Route path="/come-funziona" element={<WideLayout><HowItWorksPage /></WideLayout>} />
 
           {/* Route protette */}
           <Route path="/songs" element={
@@ -94,8 +96,8 @@ export default function App() {
           } />
 
           {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/songs" replace />} />
-          <Route path="*" element={<Navigate to="/songs" replace />} />
+          <Route path="/" element={<Navigate to="/come-funziona" replace />} />
+          <Route path="*" element={<Navigate to="/come-funziona" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
