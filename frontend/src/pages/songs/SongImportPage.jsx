@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { downloadImportTemplate, importSongs } from '../../api/songs';
+import { importSongs } from '../../api/songs';
 import { getGroups } from '../../api/groups';
 
 export default function SongImportPage() {
@@ -21,8 +21,14 @@ export default function SongImportPage() {
 
   const handleDownload = async () => {
     try {
-      const res = await downloadImportTemplate();
-      const url = URL.createObjectURL(res.data);
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${baseUrl}/songs/import-template/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { alert(t('common.error')); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'template_canti.xlsx';

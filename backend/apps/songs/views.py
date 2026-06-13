@@ -87,10 +87,9 @@ class SongViewSet(viewsets.ModelViewSet):
     def import_template(self, request):
         """GET /api/v1/songs/import-template/ — scarica template Excel compilabile."""
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, fills
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
         from openpyxl.worksheet.datavalidation import DataValidation
-        from openpyxl.worksheet.dimensions import RowDimension
         from django.http import HttpResponse
 
         KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B']
