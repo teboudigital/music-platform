@@ -9,6 +9,16 @@ export const deleteSong = (id) => client.delete(`/songs/${id}/`);
 export const transposeSong = (id, semitones) =>
   client.get(`/songs/${id}/transpose/`, { params: { semitones } });
 
+export const downloadImportTemplate = () =>
+  client.get('/songs/import-template/', { responseType: 'blob' });
+
+export const importSongs = (file, groupId) => {
+  const form = new FormData();
+  form.append('file', file);
+  if (groupId) form.append('group', groupId);
+  return client.post('/songs/import/', form);
+};
+
 export const getLyricLines = (songId) => client.get(`/songs/${songId}/lines/`);
 export const createLyricLine = (songId, data) => client.post(`/songs/${songId}/lines/`, data);
 export const updateLyricLine = (songId, lineId, data) =>

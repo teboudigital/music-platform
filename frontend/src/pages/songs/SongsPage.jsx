@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { getSongs, deleteSong, getTopics } from '../../api/songs';
-import { getGroup } from '../../api/groups';
+import { getSongs, deleteSong, getTopics, downloadImportTemplate, importSongs } from '../../api/songs';
+import { getGroup, getGroups } from '../../api/groups';
 import AppSidebar from '../../components/AppSidebar';
 
 const KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B'];
@@ -21,6 +21,14 @@ export default function SongsPage() {
   const [topic, setTopic]       = useState('');
   const [topics, setTopics]     = useState([]);
   const [groupInfo, setGroupInfo] = useState(null);
+
+  const [importOpen, setImportOpen]     = useState(false);
+  const [importFile, setImportFile]     = useState(null);
+  const [importGroup, setImportGroup]   = useState('');
+  const [importGroups, setImportGroups] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileRef = useRef(null);
 
   const loadSongs = async (s = search, k = key, m = mode, o = ordering, tp = topic) => {
     setLoading(true);
@@ -76,6 +84,39 @@ export default function SongsPage() {
     loadSongs(search, key, mode, ordering, e.target.value);
   };
 
+  const openImport = () => {
+    setImportFile(null);
+    setImportResult(null);
+    setImportGroup(selectedGroup || '');
+    setImportOpen(true);
+    getGroups().then((r) => setImportGroups(r.data.results || r.data)).catch(() => {});
+  };
+
+  const handleDownloadTemplate = async () => {
+    const res = await downloadImportTemplate();
+    const url = URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'template_canti.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async () => {
+    if (!importFile) { alert(t('songs.importNoFile')); return; }
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const res = await importSongs(importFile, importGroup || null);
+      setImportResult(res.data);
+      if (res.data.imported > 0) loadSongs();
+    } catch (err) {
+      setImportResult(err.response?.data || { detail: t('common.error') });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm(t('common.confirmDelete'))) return;
     await deleteSong(id);
@@ -106,7 +147,13 @@ export default function SongsPage() {
             </div>
           )}
           {!selectedGroup && (
-            <Link to="/songs/new" className="btn-primary">{t('songs.newSong')}</Link>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Link to="/songs/new" className="btn-primary">{t('songs.newSong')}</Link>
+              <button className="btn-sm" onClick={openImport}>{t('songs.importSongs')}</button>
+            </div>
+          )}
+          {selectedGroup && (
+            <button className="btn-sm" onClick={openImport}>{t('songs.importSongs')}</button>
           )}
         </div>
 
@@ -200,6 +247,70 @@ export default function SongsPage() {
           </div>
         )}
       </div>
+
+      {importOpen && (
+        <div className="modal-overlay" onClick={() => setImportOpen(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('songs.importTitle')}</h3>
+
+            <div className="import-steps">
+              <p><strong>1.</strong> {t('songs.importDownloadTemplate')}:</p>
+              <button className="btn-sm" onClick={handleDownloadTemplate}>
+                ⬇ {t('songs.importDownloadTemplate')}
+              </button>
+
+              <p style={{ marginTop: '1rem' }}><strong>2.</strong> {t('songs.importChooseFile')}:</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => setImportFile(e.target.files[0] || null)}
+              />
+              {importFile && <span className="text-muted" style={{ fontSize: '0.85rem' }}>{importFile.name}</span>}
+
+              <p style={{ marginTop: '1rem' }}><strong>3.</strong> {t('songs.importGroup')}:</p>
+              <select
+                className="filters-select"
+                value={importGroup}
+                onChange={(e) => setImportGroup(e.target.value)}
+              >
+                <option value="">{t('songs.importPersonal')}</option>
+                {importGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {importResult && (
+              <div className="import-result" style={{ marginTop: '1rem' }}>
+                {importResult.imported > 0 && (
+                  <p className="import-success">
+                    ✓ {t('songs.importSuccess', { count: importResult.imported })}
+                  </p>
+                )}
+                {importResult.errors?.length > 0 && (
+                  <div className="import-errors">
+                    <p>✗ {t('songs.importErrors', { count: importResult.errors.length })}</p>
+                    <ul>
+                      {importResult.errors.map((e, i) => (
+                        <li key={i}>{t('songs.importRowError', { row: e.row, error: e.error })}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {importResult.detail && <p className="error">{importResult.detail}</p>}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn-sm" onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
+              <button className="btn-primary" onClick={handleImport} disabled={importLoading}>
+                {importLoading ? t('common.loading') : t('songs.importStart')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

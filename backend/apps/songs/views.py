@@ -83,6 +83,144 @@ class SongViewSet(viewsets.ModelViewSet):
                     raise PermissionDenied('Limite di 50 canti personali raggiunto. Registrati per continuare.')
         serializer.save(owner=user)
 
+    @action(detail=False, methods=['get'], url_path='import-template')
+    def import_template(self, request):
+        """GET /api/v1/songs/import-template/ — scarica template Excel vuoto."""
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+        from django.http import HttpResponse
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Canti'
+
+        headers = ['title *', 'artist', 'key', 'mode', 'bpm', 'time_signature', 'notes', 'song_number', 'topics']
+        notes_row = [
+            'Obbligatorio',
+            'Facoltativo',
+            'C C# Db D D# Eb E F F# Gb G G# Ab A A# Bb B',
+            'major / minor',
+            'Numero intero',
+            'es: 4/4  3/4  6/8',
+            'Facoltativo',
+            'Numero intero',
+            'Separati da virgola',
+        ]
+        widths = [30, 25, 40, 15, 12, 18, 40, 15, 40]
+
+        header_fill = PatternFill('solid', fgColor='1F4E79')
+        note_fill = PatternFill('solid', fgColor='D6E4F0')
+
+        for col, (h, n, w) in enumerate(zip(headers, notes_row, widths), 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = Font(bold=True, color='FFFFFF')
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+            note = ws.cell(row=2, column=col, value=n)
+            note.fill = note_fill
+            note.font = Font(italic=True, size=9, color='1F4E79')
+            ws.column_dimensions[get_column_letter(col)].width = w
+
+        # Riga esempio
+        ws.append(['Ave Maria', 'Schubert', 'F', 'major', 120, '4/4', '', 1, 'adorazione, lode'])
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="template_canti.xlsx"'
+        wb.save(response)
+        return response
+
+    @action(detail=False, methods=['post'], url_path='import')
+    def bulk_import(self, request):
+        """POST /api/v1/songs/import/ — importa canti da file Excel."""
+        from openpyxl import load_workbook
+        from apps.groups.models import MusicGroup, Membership
+
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'detail': 'Nessun file fornito.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        group_id = request.data.get('group') or None
+        group = None
+        if group_id:
+            try:
+                group = MusicGroup.objects.get(pk=group_id)
+                if not Membership.objects.filter(group=group, user=request.user).exists():
+                    return Response({'detail': 'Non sei membro di questo gruppo.'}, status=status.HTTP_403_FORBIDDEN)
+            except MusicGroup.DoesNotExist:
+                return Response({'detail': 'Gruppo non trovato.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            wb = load_workbook(file, read_only=True, data_only=True)
+            ws = wb.active
+        except Exception:
+            return Response({'detail': 'File non valido. Carica un file .xlsx.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        VALID_KEYS = {'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', ''}
+
+        imported = 0
+        errors = []
+        songs_to_create = []
+
+        for i, row in enumerate(ws.iter_rows(min_row=3, values_only=True), start=3):
+            if not row or not any(row):
+                continue
+
+            title = str(row[0]).strip() if row[0] is not None else ''
+            if not title or title == 'None':
+                errors.append({'row': i, 'error': 'Titolo obbligatorio.'})
+                continue
+
+            key = str(row[2]).strip() if row[2] is not None else ''
+            if key not in VALID_KEYS:
+                errors.append({'row': i, 'error': f'Tonalità non valida: "{key}"'})
+                continue
+
+            mode_raw = str(row[3]).strip().lower() if row[3] is not None else ''
+            mode = mode_raw if mode_raw in ('major', 'minor') else 'major'
+
+            bpm = None
+            if row[4] is not None:
+                try:
+                    bpm = int(row[4])
+                    if bpm <= 0:
+                        bpm = None
+                except (ValueError, TypeError):
+                    pass
+
+            song_number = None
+            if row[7] is not None:
+                try:
+                    song_number = int(row[7])
+                except (ValueError, TypeError):
+                    pass
+
+            topics_raw = str(row[8]).strip() if row[8] is not None else ''
+            topics = [t.strip() for t in topics_raw.split(',') if t.strip()] if topics_raw else []
+
+            songs_to_create.append(Song(
+                title=title,
+                artist=str(row[1]).strip() if row[1] is not None else '',
+                key=key,
+                mode=mode,
+                bpm=bpm,
+                time_signature=str(row[5]).strip() if row[5] is not None else '4/4',
+                notes=str(row[6]).strip() if row[6] is not None else '',
+                song_number=song_number,
+                topics=topics,
+                owner=request.user,
+                group=group,
+            ))
+
+        if songs_to_create:
+            Song.objects.bulk_create(songs_to_create)
+            imported = len(songs_to_create)
+
+        return Response({'imported': imported, 'errors': errors},
+                        status=status.HTTP_201_CREATED if imported > 0 else status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['get'], url_path='topics')
     def topics(self, request):
         """GET /api/v1/songs/topics/?group=<id> — lista argomenti disponibili."""
