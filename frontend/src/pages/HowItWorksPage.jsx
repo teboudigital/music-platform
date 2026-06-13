@@ -16,11 +16,6 @@ export default function HowItWorksPage() {
 
       <div className="hiw-features">
         <div className="hiw-card">
-          <div className="hiw-icon">👁️</div>
-          <h3>{t('hiw.feature1Title')}</h3>
-          <p>{t('hiw.feature1Desc')}</p>
-        </div>
-        <div className="hiw-card">
           <div className="hiw-icon">🎼</div>
           <h3>{t('hiw.feature2Title')}</h3>
           <p>{t('hiw.feature2Desc')}</p>
