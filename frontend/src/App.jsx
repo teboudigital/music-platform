@@ -9,6 +9,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SongsPage from './pages/songs/SongsPage';
 import SongDetailPage from './pages/songs/SongDetailPage';
 import SongFormPage from './pages/songs/SongFormPage';
+import SongImportPage from './pages/songs/SongImportPage';
 import GroupsPage from './pages/groups/GroupsPage';
 import GroupFormPage from './pages/groups/GroupFormPage';
 import GroupDetailPage from './pages/groups/GroupDetailPage';
@@ -57,6 +58,9 @@ export default function App() {
           } />
           <Route path="/songs/new" element={
             <ProtectedRoute><Layout><SongFormPage /></Layout></ProtectedRoute>
+          } />
+          <Route path="/songs/import" element={
+            <ProtectedRoute><Layout><SongImportPage /></Layout></ProtectedRoute>
           } />
           <Route path="/songs/:id" element={
             <ProtectedRoute><Layout><SongDetailPage /></Layout></ProtectedRoute>
