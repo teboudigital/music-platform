@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import i18n from '../i18n';
 
@@ -79,23 +80,25 @@ function LangDropdown() {
 }
 
 export default function Navbar() {
-  const { user } = useAuth();
-
-  const displayName = user
-    ? (user.first_name || user.email)
-    : '';
+  const { user, isGuest } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <nav className="navbar">
       <Link to="/songs" className="navbar-brand">🎵 Music Platform</Link>
       <div className="navbar-right">
         <LangDropdown />
-        {displayName && (
+        {isGuest ? (
+          <Link to="/register" className="navbar-user navbar-guest">
+            <div className="navbar-avatar"><IconPerson /></div>
+            <span>{t('auth.register')}</span>
+          </Link>
+        ) : user ? (
           <Link to="/profile" className="navbar-user">
             <div className="navbar-avatar"><IconPerson /></div>
-            <span>{displayName}</span>
+            <span>{user.first_name || user.username}</span>
           </Link>
-        )}
+        ) : null}
       </div>
     </nav>
   );
