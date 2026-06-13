@@ -93,13 +93,19 @@ export default function SongsPage() {
   };
 
   const handleDownloadTemplate = async () => {
-    const res = await downloadImportTemplate();
-    const url = URL.createObjectURL(new Blob([res.data]));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'template_canti.xlsx';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await downloadImportTemplate();
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template_canti.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert(t('common.error'));
+    }
   };
 
   const handleImport = async () => {
@@ -147,13 +153,17 @@ export default function SongsPage() {
             </div>
           )}
           {!selectedGroup && (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Link to="/songs/new" className="btn-primary">{t('songs.newSong')}</Link>
               <button className="btn-sm" onClick={openImport}>{t('songs.importSongs')}</button>
+              <button className="btn-sm" onClick={handleDownloadTemplate}>⬇ {t('songs.importDownloadTemplate')}</button>
             </div>
           )}
           {selectedGroup && (
-            <button className="btn-sm" onClick={openImport}>{t('songs.importSongs')}</button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button className="btn-sm" onClick={openImport}>{t('songs.importSongs')}</button>
+              <button className="btn-sm" onClick={handleDownloadTemplate}>⬇ {t('songs.importDownloadTemplate')}</button>
+            </div>
           )}
         </div>
 
@@ -254,12 +264,7 @@ export default function SongsPage() {
             <h3>{t('songs.importTitle')}</h3>
 
             <div className="import-steps">
-              <p><strong>1.</strong> {t('songs.importDownloadTemplate')}:</p>
-              <button className="btn-sm" onClick={handleDownloadTemplate}>
-                ⬇ {t('songs.importDownloadTemplate')}
-              </button>
-
-              <p style={{ marginTop: '1rem' }}><strong>2.</strong> {t('songs.importChooseFile')}:</p>
+              <p><strong>1.</strong> {t('songs.importChooseFile')}:</p>
               <input
                 ref={fileRef}
                 type="file"
@@ -268,7 +273,7 @@ export default function SongsPage() {
               />
               {importFile && <span className="text-muted" style={{ fontSize: '0.85rem' }}>{importFile.name}</span>}
 
-              <p style={{ marginTop: '1rem' }}><strong>3.</strong> {t('songs.importGroup')}:</p>
+              <p style={{ marginTop: '1rem' }}><strong>2.</strong> {t('songs.importGroup')}:</p>
               <select
                 className="filters-select"
                 value={importGroup}
