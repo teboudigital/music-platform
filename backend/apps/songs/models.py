@@ -1,5 +1,5 @@
 """
-Modelli del dominio musicale: Song, LyricLine, ChordAnnotation.
+Modelli del dominio musicale: Genre, Song, LyricLine, ChordAnnotation.
 Struttura gerarchica: Song → LyricLine → ChordAnnotation.
 """
 from django.conf import settings
@@ -7,6 +7,20 @@ from django.db import models
 
 from apps.common.models import AbstractBaseModel
 from apps.groups.models import MusicGroup
+
+
+class Genre(models.Model):
+    """Genere musicale — lista gestita dall'admin, usata come FK in Song."""
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        db_table = 'songs_genre'
+        verbose_name = 'Genere musicale'
+        verbose_name_plural = 'Generi musicali'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
 
 
 class Song(AbstractBaseModel):
@@ -40,11 +54,21 @@ class Song(AbstractBaseModel):
         MINOR = 'minor', 'Minore'
 
     title = models.CharField(max_length=255)
+    author = models.CharField(max_length=255, blank=True)
     artist = models.CharField(max_length=255, blank=True)
+    genre = models.ForeignKey(
+        Genre,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='songs',
+    )
+    genre_custom = models.CharField(max_length=100, blank=True)
     key = models.CharField(max_length=3, choices=Key.choices, blank=True)
     mode = models.CharField(max_length=10, choices=Mode.choices, default=Mode.MAJOR)
     bpm = models.PositiveSmallIntegerField(null=True, blank=True)
     time_signature = models.CharField(max_length=10, default='4/4')
+    lyrics = models.TextField(blank=True)
+    chords = models.JSONField(default=list, blank=True)
     notes = models.TextField(blank=True)
     song_number = models.PositiveIntegerField(null=True, blank=True, db_index=True)
     topics = models.JSONField(default=list, blank=True)

@@ -47,6 +47,12 @@ export function AuthProvider({ children }) {
     return me.data;
   };
 
+  const loginAsDemo = async () => {
+    const DEMO_EMAIL    = import.meta.env.VITE_DEMO_EMAIL    || 'demo@musicplatform.it';
+    const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || 'Demo1234!';
+    return login(DEMO_EMAIL, DEMO_PASSWORD);
+  };
+
   const logout = async () => {
     try {
       await authApi.logout(localStorage.getItem('refresh_token'));
@@ -67,14 +73,18 @@ export function AuthProvider({ children }) {
 
   const isGuest = user?.is_guest === true;
 
+  const isDemo = user?.is_demo === true;
+
   return (
     <AuthContext.Provider value={{
       user,
       login,
+      loginAsDemo,
       logout,
       refreshUser,
       isAuthenticated: !!user,
       isGuest,
+      isDemo,
       loading,
     }}>
       {children}

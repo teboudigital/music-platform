@@ -19,6 +19,14 @@ export const importSongs = (file, groupId) => {
   return client.post('/songs/import/', form);
 };
 
+export const getAppFiles = () => client.get('/songs/app-files/');
+
+export const importFromApp = (fileKey, groupId) => {
+  const data = { file_key: fileKey };
+  if (groupId) data.group = groupId;
+  return client.post('/songs/import-from-app/', data);
+};
+
 export const getLyricLines = (songId) => client.get(`/songs/${songId}/lines/`);
 export const createLyricLine = (songId, data) => client.post(`/songs/${songId}/lines/`, data);
 export const updateLyricLine = (songId, lineId, data) =>

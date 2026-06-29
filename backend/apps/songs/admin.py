@@ -4,7 +4,13 @@ Gli Inline permettono di gestire le entità figlie direttamente dalla pagina del
 """
 from django.contrib import admin
 
-from .models import ChordAnnotation, LyricLine, Song
+from .models import ChordAnnotation, Genre, LyricLine, Song
+
+
+@admin.register(Genre)
+class GenreAdmin(admin.ModelAdmin):
+    list_display = ['name']
+    search_fields = ['name']
 
 
 class ChordInline(admin.TabularInline):
@@ -24,9 +30,9 @@ class LyricLineInline(admin.TabularInline):
 class SongAdmin(admin.ModelAdmin):
     """Admin per le canzoni: include le righe testo inline e filtri per tonalità/modo."""
     inlines = [LyricLineInline]
-    list_display = ['title', 'artist', 'key', 'mode', 'bpm', 'owner', 'created_at']
-    list_filter = ['key', 'mode']
-    search_fields = ['title', 'artist']
+    list_display = ['title', 'author', 'artist', 'genre', 'key', 'mode', 'bpm', 'owner', 'created_at']
+    list_filter = ['key', 'mode', 'genre']
+    search_fields = ['title', 'author', 'artist']
     ordering = ['title']
 
 
