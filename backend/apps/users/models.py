@@ -21,6 +21,7 @@ class CustomUser(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
     is_guest = models.BooleanField(default=False)
+    is_demo  = models.BooleanField(default=False)
     guest_token = models.UUIDField(default=uuid.uuid4, unique=True)
 
     # Django usa questo campo per il login

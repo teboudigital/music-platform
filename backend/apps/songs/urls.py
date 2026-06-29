@@ -1,9 +1,10 @@
 from rest_framework_nested import routers
 
-from .views import ChordAnnotationViewSet, LyricLineViewSet, SongViewSet
+from .views import ChordAnnotationViewSet, GenreViewSet, LyricLineViewSet, SongViewSet
 
 router = routers.DefaultRouter()
 router.register(r'songs', SongViewSet, basename='song')
+router.register(r'genres', GenreViewSet, basename='genre')
 
 songs_router = routers.NestedSimpleRouter(router, r'songs', lookup='song')
 songs_router.register(r'lines', LyricLineViewSet, basename='song-lyricline')

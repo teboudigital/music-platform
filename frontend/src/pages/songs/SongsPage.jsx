@@ -12,18 +12,21 @@ export default function SongsPage() {
   const [searchParams] = useSearchParams();
   const selectedGroup = searchParams.get('group');
 
-  const [songs, setSongs]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-  const [key, setKey]           = useState('');
-  const [mode, setMode]         = useState('');
-  const [ordering, setOrdering] = useState('song_number');
-  const [topic, setTopic]       = useState('');
-  const [topics, setTopics]     = useState([]);
+  const [songs, setSongs]         = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [key, setKey]             = useState('');
+  const [mode, setMode]           = useState('');
+  const [ordering, setOrdering]   = useState('song_number');
+  const [topic, setTopic]         = useState('');
+  const [topics, setTopics]       = useState([]);
   const [groupInfo, setGroupInfo] = useState(null);
+  const [selected, setSelected]   = useState(new Set());
+  const [deleting, setDeleting]   = useState(false);
 
   const loadSongs = async (s = search, k = key, m = mode, o = ordering, tp = topic) => {
     setLoading(true);
+    setSelected(new Set());
     const params = { page_size: 1000, ordering: o };
     if (s) params.search = s;
     if (k) params.key = k;
@@ -51,36 +54,43 @@ export default function SongsPage() {
     loadSongs(search, key, mode, ordering, '');
   }, [selectedGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    loadSongs();
-  };
-
-  const handleKey = (e) => {
-    setKey(e.target.value);
-    loadSongs(search, e.target.value, mode, ordering);
-  };
-
-  const handleMode = (e) => {
-    setMode(e.target.value);
-    loadSongs(search, key, e.target.value, ordering);
-  };
-
-  const handleOrdering = (o) => {
-    setOrdering(o);
-    loadSongs(search, key, mode, o, topic);
-  };
-
-  const handleTopic = (e) => {
-    setTopic(e.target.value);
-    loadSongs(search, key, mode, ordering, e.target.value);
-  };
+  const handleSearch   = (e) => { e.preventDefault(); loadSongs(); };
+  const handleKey      = (e) => { setKey(e.target.value); loadSongs(search, e.target.value, mode, ordering); };
+  const handleMode     = (e) => { setMode(e.target.value); loadSongs(search, key, e.target.value, ordering); };
+  const handleOrdering = (o) => { setOrdering(o); loadSongs(search, key, mode, o, topic); };
+  const handleTopic    = (e) => { setTopic(e.target.value); loadSongs(search, key, mode, ordering, e.target.value); };
 
   const handleDelete = async (id) => {
     if (!window.confirm(t('common.confirmDelete'))) return;
     await deleteSong(id);
     loadSongs();
   };
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected(selected.size === songs.length ? new Set() : new Set(songs.map((s) => s.id)));
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(t('songs.confirmBulkDelete', { count: selected.size }))) return;
+    setDeleting(true);
+    try {
+      await Promise.all([...selected].map((id) => deleteSong(id)));
+      loadSongs();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const allSelected  = songs.length > 0 && selected.size === songs.length;
+  const someSelected = selected.size > 0;
 
   const panelTitle = selectedGroup
     ? (groupInfo?.name || '...')
@@ -91,7 +101,7 @@ export default function SongsPage() {
       <AppSidebar />
 
       <div className="content-panel">
-        {/* Intestazione pannello */}
+        {/* Intestazione */}
         <div className="content-panel-header">
           <h2 className="content-panel-title">{panelTitle}</h2>
           {selectedGroup && groupInfo && (
@@ -128,9 +138,7 @@ export default function SongsPage() {
           />
           <select className="filters-select" value={key} onChange={handleKey}>
             <option value="">{t('songs.allKeys')}</option>
-            {KEYS.map((k) => (
-              <option key={k} value={k}>{k}</option>
-            ))}
+            {KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
           <select className="filters-select" value={mode} onChange={handleMode}>
             <option value="">{t('songs.allModes')}</option>
@@ -140,9 +148,7 @@ export default function SongsPage() {
           {topics.length > 0 && (
             <select className="filters-select" value={topic} onChange={handleTopic}>
               <option value="">{t('songs.allTopics')}</option>
-              {topics.map((tp) => (
-                <option key={tp} value={tp}>{tp}</option>
-              ))}
+              {topics.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
             </select>
           )}
           <button type="submit" className="filters-search-btn" aria-label="Cerca">
@@ -156,15 +162,32 @@ export default function SongsPage() {
         {/* Ordinamento */}
         <div className="sort-bar">
           <span className="sort-label">{t('songs.sortBy')}:</span>
-          <button
-            className={`sort-btn${ordering === 'song_number' ? ' active' : ''}`}
-            onClick={() => handleOrdering('song_number')}
-          ># {t('songs.number')}</button>
-          <button
-            className={`sort-btn${ordering === 'title' ? ' active' : ''}`}
-            onClick={() => handleOrdering('title')}
-          >A–Z {t('songs.title')}</button>
+          <button className={`sort-btn${ordering === 'song_number' ? ' active' : ''}`}
+            onClick={() => handleOrdering('song_number')}>
+            # {t('songs.number')}
+          </button>
+          <button className={`sort-btn${ordering === 'title' ? ' active' : ''}`}
+            onClick={() => handleOrdering('title')}>
+            A–Z {t('songs.title')}
+          </button>
         </div>
+
+        {/* Barra azioni bulk — separata e indipendente */}
+        {someSelected && (
+          <div className="bulk-action-bar">
+            <span className="bulk-count">
+              {t('songs.selectedCount', { count: selected.size })}
+            </span>
+            <div className="bulk-action-btns">
+              <button className="btn-bulk-delete" onClick={handleBulkDelete} disabled={deleting}>
+                {deleting ? t('common.loading') : t('songs.deleteSelected')}
+              </button>
+              <button className="btn-sm" onClick={() => setSelected(new Set())}>
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tabella canti */}
         {loading ? (
@@ -176,6 +199,14 @@ export default function SongsPage() {
             <table className="songs-table">
               <thead>
                 <tr>
+                  <th className="col-check">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      title="Seleziona tutti"
+                    />
+                  </th>
                   <th className="col-num">#</th>
                   <th className="col-title">{t('songs.title')}</th>
                   <th className="col-key">{t('songs.key')}</th>
@@ -189,8 +220,16 @@ export default function SongsPage() {
                   const keyLabel = song.key
                     ? `${song.key} ${song.mode === 'major' ? t('songs.major') : t('songs.minor')}`
                     : '—';
+                  const isChecked = selected.has(song.id);
                   return (
-                    <tr key={song.id}>
+                    <tr key={song.id} className={isChecked ? 'row-selected' : ''}>
+                      <td className="col-check">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelect(song.id)}
+                        />
+                      </td>
                       <td className="col-num">{num}</td>
                       <td className="col-title">
                         <Link to={`/songs/${song.id}`}>{song.title}</Link>
