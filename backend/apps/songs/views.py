@@ -17,9 +17,10 @@ class SongPagination(PageNumberPagination):
 
 from apps.common.permissions import IsOwner
 from .filters import SongFilter
-from .models import ChordAnnotation, LyricLine, Song
+from .models import ChordAnnotation, Genre, LyricLine, Song
 from .serializers import (
     ChordAnnotationSerializer,
+    GenreSerializer,
     LyricLineSerializer,
     SongListSerializer,
     SongSerializer,
@@ -38,7 +39,7 @@ class SongViewSet(viewsets.ModelViewSet):
     pagination_class = SongPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = SongFilter
-    search_fields = ['title', 'artist']
+    search_fields = ['title', 'author', 'artist']
     ordering_fields = ['title', 'song_number', 'created_at', 'bpm']
     ordering = ['song_number']
 
@@ -289,7 +290,13 @@ class SongViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({'detail': 'File non valido. Carica un file .xlsx.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Colonne Excel (ordine = posizione nel template):
+        # 0:title 1:author 2:artist 3:genre 4:genre_custom
+        # 5:key 6:mode 7:bpm 8:time_signature
+        # 9:lyrics 10:chords 11:notes 12:song_number 13:topics
+
         VALID_KEYS = {'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B', ''}
+        genre_cache = {}
 
         imported = 0
         errors = []
@@ -299,46 +306,64 @@ class SongViewSet(viewsets.ModelViewSet):
             if not row or not any(row):
                 continue
 
-            title = str(row[0]).strip() if row[0] is not None else ''
+            def cell(idx):
+                return str(row[idx]).strip() if len(row) > idx and row[idx] is not None else ''
+
+            title = cell(0)
             if not title or title == 'None':
                 errors.append({'row': i, 'error': 'Titolo obbligatorio.'})
                 continue
 
-            key = str(row[2]).strip() if row[2] is not None else ''
+            key = cell(5)
             if key not in VALID_KEYS:
                 errors.append({'row': i, 'error': f'Tonalità non valida: "{key}"'})
                 continue
 
-            mode_raw = str(row[3]).strip().lower() if row[3] is not None else ''
+            mode_raw = cell(6).lower()
             mode = mode_raw if mode_raw in ('major', 'minor') else 'major'
 
             bpm = None
-            if row[4] is not None:
+            if len(row) > 7 and row[7] is not None:
                 try:
-                    bpm = int(row[4])
+                    bpm = int(row[7])
                     if bpm <= 0:
                         bpm = None
                 except (ValueError, TypeError):
                     pass
 
             song_number = None
-            if row[7] is not None:
+            if len(row) > 12 and row[12] is not None:
                 try:
-                    song_number = int(row[7])
+                    song_number = int(row[12])
                 except (ValueError, TypeError):
                     pass
 
-            topics_raw = str(row[8]).strip() if row[8] is not None else ''
+            topics_raw = cell(13)
             topics = [t.strip() for t in topics_raw.split(',') if t.strip()] if topics_raw else []
+
+            chords_raw = cell(10)
+            chords = [c.strip() for c in chords_raw.split(',') if c.strip()] if chords_raw else []
+
+            genre_name = cell(3)
+            genre_obj = None
+            if genre_name:
+                if genre_name not in genre_cache:
+                    genre_cache[genre_name], _ = Genre.objects.get_or_create(name=genre_name)
+                genre_obj = genre_cache[genre_name]
 
             songs_to_create.append(Song(
                 title=title,
-                artist=str(row[1]).strip() if row[1] is not None else '',
+                author=cell(1),
+                artist=cell(2),
+                genre=genre_obj,
+                genre_custom=cell(4),
                 key=key,
                 mode=mode,
                 bpm=bpm,
-                time_signature=str(row[5]).strip() if row[5] is not None else '4/4',
-                notes=str(row[6]).strip() if row[6] is not None else '',
+                time_signature=cell(8) or '4/4',
+                lyrics=cell(9),
+                chords=chords,
+                notes=cell(11),
                 song_number=song_number,
                 topics=topics,
                 owner=request.user,
@@ -346,11 +371,163 @@ class SongViewSet(viewsets.ModelViewSet):
             ))
 
         if songs_to_create:
+            incoming_titles = [s.title for s in songs_to_create]
+            duplicates = list(
+                Song.objects.filter(
+                    owner=request.user, group=group,
+                    title__in=incoming_titles,
+                ).values_list('title', flat=True)
+            )
+            if duplicates:
+                return Response({
+                    'detail': f'Canti già presenti nel repertorio: {", ".join(sorted(duplicates))}',
+                    'duplicates': sorted(duplicates),
+                }, status=status.HTTP_409_CONFLICT)
+
             Song.objects.bulk_create(songs_to_create)
             imported = len(songs_to_create)
 
         return Response({'imported': imported, 'errors': errors},
                         status=status.HTTP_201_CREATED if imported > 0 else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='app-files', permission_classes=[permissions.IsAuthenticated])
+    def app_files(self, request):
+        """GET /api/v1/songs/app-files/ — lista file Excel disponibili nell'app."""
+        import os
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                '..', '..', 'data', 'excel')
+        base_dir = os.path.normpath(base_dir)
+
+        files = []
+        for folder in ('demo', 'base'):
+            folder_path = os.path.join(base_dir, folder)
+            if not os.path.isdir(folder_path):
+                continue
+            for fname in sorted(os.listdir(folder_path)):
+                if not fname.endswith('.xlsx') or fname.startswith('.'):
+                    continue
+                fpath = os.path.join(folder_path, fname)
+                size_kb = round(os.path.getsize(fpath) / 1024, 1)
+                files.append({
+                    'key':    f'{folder}/{fname}',
+                    'name':   fname.replace('_', ' ').replace('.xlsx', '').title(),
+                    'folder': folder,
+                    'size':   f'{size_kb} KB',
+                })
+        return Response(files)
+
+    @action(detail=False, methods=['post'], url_path='import-from-app', permission_classes=[permissions.IsAuthenticated])
+    def import_from_app(self, request):
+        """POST /api/v1/songs/import-from-app/ — importa da file Excel salvato nell'app."""
+        import os
+        from openpyxl import load_workbook
+        from apps.groups.models import MusicGroup, Membership
+
+        file_key = request.data.get('file_key', '')
+        if not file_key or '..' in file_key or not file_key.endswith('.xlsx'):
+            return Response({'detail': 'file_key non valido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        base_dir = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'excel'
+        ))
+        file_path = os.path.normpath(os.path.join(base_dir, file_key))
+
+        # Sicurezza: il percorso deve restare dentro base_dir
+        if not file_path.startswith(base_dir):
+            return Response({'detail': 'Percorso non consentito.'}, status=status.HTTP_403_FORBIDDEN)
+        if not os.path.isfile(file_path):
+            return Response({'detail': 'File non trovato.'}, status=status.HTTP_404_NOT_FOUND)
+
+        group_id = request.data.get('group') or None
+        group = None
+        if group_id:
+            try:
+                group = MusicGroup.objects.get(pk=group_id)
+                if not Membership.objects.filter(group=group, user=request.user).exists():
+                    return Response({'detail': 'Non sei membro di questo gruppo.'}, status=status.HTTP_403_FORBIDDEN)
+            except MusicGroup.DoesNotExist:
+                return Response({'detail': 'Gruppo non trovato.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            wb = load_workbook(file_path, read_only=True, data_only=True)
+            ws = next((wb[s] for s in ('Innario', 'Canti') if s in wb.sheetnames), wb.active)
+        except Exception:
+            return Response({'detail': 'File non valido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        VALID_KEYS = {'C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B',''}
+        genre_cache = {}
+        songs_to_create = []
+        errors = []
+
+        for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            if not row or not any(row):
+                continue
+
+            def cell(idx):
+                return str(row[idx]).strip() if len(row) > idx and row[idx] is not None else ''
+
+            title = cell(0)
+            if not title or title in ('None', 'Titolo  ★'):
+                continue
+
+            key = cell(5)
+            if key not in VALID_KEYS:
+                errors.append({'row': i, 'error': f'Tonalità non valida: "{key}"'})
+                continue
+
+            mode_raw = cell(6).lower()
+            mode = mode_raw if mode_raw in ('major', 'minor') else 'major'
+
+            bpm = None
+            try:
+                bpm = int(row[7]) if len(row) > 7 and row[7] else None
+            except (ValueError, TypeError):
+                pass
+
+            song_number = None
+            try:
+                song_number = int(row[12]) if len(row) > 12 and row[12] else None
+            except (ValueError, TypeError):
+                pass
+
+            topics = [t.strip() for t in cell(13).split(',') if t.strip()]
+            chords = [c.strip() for c in cell(10).split(',') if c.strip()]
+
+            genre_name = cell(3)
+            genre_obj = None
+            if genre_name:
+                if genre_name not in genre_cache:
+                    genre_cache[genre_name], _ = Genre.objects.get_or_create(name=genre_name)
+                genre_obj = genre_cache[genre_name]
+
+            songs_to_create.append(Song(
+                title=title, author=cell(1), artist=cell(2),
+                genre=genre_obj, genre_custom=cell(4),
+                key=key, mode=mode, bpm=bpm,
+                time_signature=cell(8) or '4/4',
+                lyrics=cell(9), chords=chords,
+                notes=cell(11), song_number=song_number,
+                topics=topics, owner=request.user, group=group,
+            ))
+
+        if songs_to_create:
+            duplicates = list(
+                Song.objects.filter(
+                    owner=request.user, group=group,
+                    title__in=[s.title for s in songs_to_create],
+                ).values_list('title', flat=True)
+            )
+            if duplicates:
+                return Response({
+                    'detail': f'Canti già presenti nel repertorio: {", ".join(sorted(duplicates))}',
+                    'duplicates': sorted(duplicates),
+                }, status=status.HTTP_409_CONFLICT)
+            Song.objects.bulk_create(songs_to_create)
+
+        return Response(
+            {'imported': len(songs_to_create), 'errors': errors},
+            status=status.HTTP_201_CREATED if songs_to_create else status.HTTP_400_BAD_REQUEST,
+        )
 
     @action(detail=False, methods=['get'], url_path='topics')
     def topics(self, request):
@@ -430,3 +607,10 @@ class ChordAnnotationViewSet(viewsets.ModelViewSet):
             song__owner=self.request.user,
         )
         serializer.save(lyric_line=lyric_line)
+
+
+class GenreViewSet(viewsets.ReadOnlyModelViewSet):
+    """GET /api/v1/genres/ — lista generi musicali disponibili."""
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+    permission_classes = [permissions.IsAuthenticated]

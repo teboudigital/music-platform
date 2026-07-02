@@ -1,17 +1,49 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function HowItWorksPage() {
   const { t } = useTranslation();
-  const { isGuest } = useAuth();
+  const { isGuest, isDemo, loginAsDemo } = useAuth();
+  const navigate = useNavigate();
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError]     = useState('');
+
+  const handleDemo = async () => {
+    setDemoLoading(true);
+    setDemoError('');
+    try {
+      await loginAsDemo();
+      navigate('/songs');
+    } catch {
+      setDemoError(t('hiw.demoError'));
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   return (
     <div className="how-it-works">
       <div className="hiw-hero">
         <h1>🎵 Music Platform</h1>
         <p className="hiw-subtitle">{t('hiw.subtitle')}</p>
-        <Link to="/songs" className="btn-primary hiw-cta">{t('hiw.cta')}</Link>
+        <div className="hiw-hero-actions">
+          {!isDemo && (
+            <button
+              className="btn-primary hiw-cta"
+              onClick={handleDemo}
+              disabled={demoLoading}
+            >
+              {demoLoading ? t('common.loading') : t('hiw.tryDemo')}
+            </button>
+          )}
+          {isDemo && (
+            <Link to="/songs" className="btn-primary hiw-cta">{t('hiw.cta')}</Link>
+          )}
+          <Link to="/login" className="btn-sm hiw-cta-secondary">{t('hiw.loginReal')}</Link>
+        </div>
+        {demoError && <p className="error" style={{ marginTop: '0.5rem' }}>{demoError}</p>}
       </div>
 
       <div className="hiw-features">
@@ -43,7 +75,12 @@ export default function HowItWorksPage() {
               <li>✓ {t('hiw.planDemo3')}</li>
               <li>✓ {t('hiw.planDemo4')}</li>
             </ul>
-            <Link to="/songs" className="btn-sm">{t('hiw.cta')}</Link>
+            {!isDemo
+              ? <button className="btn-sm" onClick={handleDemo} disabled={demoLoading}>
+                  {demoLoading ? t('common.loading') : t('hiw.tryDemo')}
+                </button>
+              : <Link to="/songs" className="btn-sm">{t('hiw.cta')}</Link>
+            }
           </div>
           <div className="hiw-plan hiw-plan-featured">
             <div className="hiw-plan-badge">{t('hiw.planFreeBadge')}</div>

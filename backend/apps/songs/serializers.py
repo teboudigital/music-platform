@@ -4,7 +4,13 @@ Un serializer converte oggetti Python/Django in JSON (e viceversa) per le API RE
 """
 from rest_framework import serializers
 
-from .models import ChordAnnotation, LyricLine, Song
+from .models import ChordAnnotation, Genre, LyricLine, Song
+
+
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = ['id', 'name']
 
 
 class ChordAnnotationSerializer(serializers.ModelSerializer):
@@ -37,12 +43,17 @@ class SongSerializer(serializers.ModelSerializer):
     """
     owner = serializers.StringRelatedField(read_only=True)
     lyric_lines = LyricLineSerializer(many=True, read_only=True)
+    genre_name = serializers.StringRelatedField(source='genre', read_only=True)
 
     class Meta:
         model = Song
         fields = [
-            'id', 'title', 'artist', 'key', 'mode', 'bpm',
-            'time_signature', 'notes', 'owner', 'lyric_lines',
+            'id', 'title', 'author', 'artist',
+            'genre', 'genre_name', 'genre_custom',
+            'key', 'mode', 'bpm', 'time_signature',
+            'lyrics', 'chords',
+            'notes', 'song_number', 'topics',
+            'owner', 'lyric_lines',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
@@ -54,8 +65,14 @@ class SongListSerializer(serializers.ModelSerializer):
     Non include le righe testo per evitare risposte troppo pesanti.
     """
     owner = serializers.StringRelatedField(read_only=True)
+    genre_name = serializers.StringRelatedField(source='genre', read_only=True)
 
     class Meta:
         model = Song
-        fields = ['id', 'title', 'artist', 'key', 'mode', 'bpm', 'song_number', 'topics', 'notes', 'owner', 'created_at']
+        fields = [
+            'id', 'title', 'author', 'artist',
+            'genre', 'genre_name', 'genre_custom',
+            'key', 'mode', 'bpm', 'song_number',
+            'topics', 'notes', 'owner', 'created_at',
+        ]
         read_only_fields = ['id', 'owner', 'created_at']
