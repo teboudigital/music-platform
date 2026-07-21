@@ -2,6 +2,7 @@ import client from './client';
 
 export const getSongs = (params) => client.get('/songs/', { params });
 export const getTopics = (params) => client.get('/songs/topics/', { params });
+export const getKnownTopics = () => client.get('/songs/known-topics/');
 export const getSong = (id) => client.get(`/songs/${id}/`);
 export const createSong = (data) => client.post('/songs/', data);
 export const updateSong = (id, data) => client.patch(`/songs/${id}/`, data);
