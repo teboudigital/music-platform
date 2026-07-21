@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { getSongs, deleteSong, getTopics } from '../../api/songs';
+import { getSongs, deleteSong, getKnownTopics } from '../../api/songs';
 import { getGroup } from '../../api/groups';
 import AppSidebar from '../../components/AppSidebar';
 
@@ -23,6 +23,7 @@ export default function SongsPage() {
   const [groupInfo, setGroupInfo] = useState(null);
   const [selected, setSelected]   = useState(new Set());
   const [deleting, setDeleting]   = useState(false);
+  const searchTimer = useRef(null);
 
   const loadSongs = async (s = search, k = key, m = mode, o = ordering, tp = topic) => {
     setLoading(true);
@@ -42,21 +43,22 @@ export default function SongsPage() {
   };
 
   useEffect(() => {
+    setGroupInfo(null);
     if (selectedGroup) {
-      setGroupInfo(null);
       getGroup(selectedGroup).then((r) => setGroupInfo(r.data)).catch(() => {});
-      getTopics({ group: selectedGroup }).then((r) => setTopics(r.data)).catch(() => {});
-    } else {
-      setGroupInfo(null);
-      setTopics([]);
     }
+    getKnownTopics().then((r) => setTopics(r.data)).catch(() => setTopics([]));
     setTopic('');
     loadSongs(search, key, mode, ordering, '');
   }, [selectedGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSearch   = (e) => { e.preventDefault(); loadSongs(); };
+  const handleSearch = (e) => {
+    const val = e.target.value;
+    setSearch(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => loadSongs(val, key, mode, ordering, topic), 400);
+  };
   const handleKey      = (e) => { setKey(e.target.value); loadSongs(search, e.target.value, mode, ordering); };
-  const handleMode     = (e) => { setMode(e.target.value); loadSongs(search, key, e.target.value, ordering); };
   const handleOrdering = (o) => { setOrdering(o); loadSongs(search, key, mode, o, topic); };
   const handleTopic    = (e) => { setTopic(e.target.value); loadSongs(search, key, mode, ordering, e.target.value); };
 
@@ -129,35 +131,22 @@ export default function SongsPage() {
         </div>
 
         {/* Barra filtri */}
-        <form className="filters-bar" onSubmit={handleSearch}>
+        <div className="filters-bar">
           <input
             className="filters-search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearch}
             placeholder={t('songs.search')}
           />
           <select className="filters-select" value={key} onChange={handleKey}>
             <option value="">{t('songs.allKeys')}</option>
             {KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
-          <select className="filters-select" value={mode} onChange={handleMode}>
-            <option value="">{t('songs.allModes')}</option>
-            <option value="major">{t('songs.major')}</option>
-            <option value="minor">{t('songs.minor')}</option>
+          <select className="filters-select" value={topic} onChange={handleTopic}>
+            <option value="">{t('songs.allTopics')}</option>
+            {topics.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
           </select>
-          {topics.length > 0 && (
-            <select className="filters-select" value={topic} onChange={handleTopic}>
-              <option value="">{t('songs.allTopics')}</option>
-              {topics.map((tp) => <option key={tp} value={tp}>{tp}</option>)}
-            </select>
-          )}
-          <button type="submit" className="filters-search-btn" aria-label="Cerca">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-          </button>
-        </form>
+        </div>
 
         {/* Ordinamento */}
         <div className="sort-bar">
