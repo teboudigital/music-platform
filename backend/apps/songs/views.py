@@ -459,6 +459,9 @@ class SongViewSet(viewsets.ModelViewSet):
         songs_to_create = []
         errors = []
 
+        # Colonne innario_verso.xlsx:
+        # 0:N°Innario 1:Titolo 2:Autore 3:Interprete 4:Genere 5:GenereCustom
+        # 6:Tonalità 7:Modalità 8:BPM 9:Ritmo 10:Testo 11:Accordi 12:Note 13:Argomenti
         for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             if not row or not any(row):
                 continue
@@ -466,34 +469,34 @@ class SongViewSet(viewsets.ModelViewSet):
             def cell(idx):
                 return str(row[idx]).strip() if len(row) > idx and row[idx] is not None else ''
 
-            title = cell(0)
-            if not title or title in ('None', 'Titolo  ★'):
+            title = cell(1)
+            if not title or title in ('None', 'Titolo  ★', 'Titolo'):
                 continue
 
-            key = cell(5)
+            key = cell(6)
             if key not in VALID_KEYS:
                 errors.append({'row': i, 'error': f'Tonalità non valida: "{key}"'})
                 continue
 
-            mode_raw = cell(6).lower()
+            mode_raw = cell(7).lower()
             mode = mode_raw if mode_raw in ('major', 'minor') else 'major'
 
             bpm = None
             try:
-                bpm = int(row[7]) if len(row) > 7 and row[7] else None
+                bpm = int(row[8]) if len(row) > 8 and row[8] else None
             except (ValueError, TypeError):
                 pass
 
             song_number = None
             try:
-                song_number = int(row[12]) if len(row) > 12 and row[12] else None
+                song_number = int(row[0]) if len(row) > 0 and row[0] else None
             except (ValueError, TypeError):
                 pass
 
             topics = [t.strip() for t in cell(13).split(',') if t.strip()]
-            chords = [c.strip() for c in cell(10).split(',') if c.strip()]
+            chords = [c.strip() for c in cell(11).split(',') if c.strip()]
 
-            genre_name = cell(3)
+            genre_name = cell(4)
             genre_obj = None
             if genre_name:
                 if genre_name not in genre_cache:
@@ -501,12 +504,12 @@ class SongViewSet(viewsets.ModelViewSet):
                 genre_obj = genre_cache[genre_name]
 
             songs_to_create.append(Song(
-                title=title, author=cell(1), artist=cell(2),
-                genre=genre_obj, genre_custom=cell(4),
+                title=title, author=cell(2), artist=cell(3),
+                genre=genre_obj, genre_custom=cell(5),
                 key=key, mode=mode, bpm=bpm,
-                time_signature=cell(8) or '4/4',
-                lyrics=cell(9), chords=chords,
-                notes=cell(11), song_number=song_number,
+                time_signature=cell(9) or '4/4',
+                lyrics=cell(10), chords=chords,
+                notes=cell(12), song_number=song_number,
                 topics=topics, owner=request.user, group=group,
             ))
 
@@ -538,6 +541,18 @@ class SongViewSet(viewsets.ModelViewSet):
             if topics_list:
                 all_topics.update(topics_list)
         return Response(sorted(all_topics))
+
+    @action(detail=False, methods=['get'], url_path='known-topics')
+    def known_topics(self, request):
+        """GET /api/v1/songs/known-topics/ — lista fissa di tutti gli argomenti dell'innario."""
+        topics = [
+            'adorazione', 'bambini', 'battaglia', 'consacrazione',
+            'guarigione', 'incoraggiamento', 'lode', 'offerta',
+            'proclamazione', 'redenzione e spirito santo', 'ringraziamento',
+            'santa cena', 'testimonianza e fede', 'unita',
+            'visione e profezia', 'vittoria',
+        ]
+        return Response(sorted(topics))
 
     @action(detail=True, methods=['get'], url_path='transpose')
     def transpose(self, request, pk=None):
